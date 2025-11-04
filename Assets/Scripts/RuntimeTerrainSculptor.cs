@@ -112,7 +112,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
                 {
                     SculptAtPosition(terrain, hit.point);
                 }
-                else if(shouldSculpt == -1 && heightmapBrush != null)
+                else if (shouldSculpt == -1 && heightmapBrush != null)
                 {
                     EraseAtPosition(terrain, hit.point);
                 }
@@ -220,7 +220,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         }
     }
 
-    void EraseAtPosition(Terrain terrain, Vector3 worldPosition)
+    void SubtractAtPosition(Terrain terrain, Vector3 worldPosition)
     {
         if (terrain == null || heightmapBrush == null) return;
 
@@ -270,6 +270,56 @@ public class RuntimeTerrainSculptor : MonoBehaviour
                     float newHeight = Mathf.Lerp(currentHeight, 0f, brushAlpha * strength);
 
                     heights[z, x] = Mathf.Clamp01(newHeight);
+                }
+            }
+        }
+
+        terrainData.SetHeights(startX, startZ, heights);
+    }
+
+    private void EraseAtPosition(Terrain terrain, Vector3 worldPosition)
+    {
+        if (terrain == null || heightmapBrush == null) return;
+
+        TerrainData terrainData = terrain.terrainData;
+
+        // Convert world position to terrain-relative position
+        Vector3 terrainPos = worldPosition - terrain.transform.position;
+
+        // Convert to heightmap coordinates
+        int heightmapWidth = terrainData.heightmapResolution;
+        int heightmapHeight = terrainData.heightmapResolution;
+
+        int centerX = (int)((terrainPos.x / terrainData.size.x) * heightmapWidth);
+        int centerZ = (int)((terrainPos.z / terrainData.size.z) * heightmapHeight);
+
+        // Calculate brush size in heightmap coordinates
+        int brushSizeInHeightmap = (int)((brushSize / terrainData.size.x) * heightmapWidth);
+
+        // Get current heightmap data
+        int startX = Mathf.Max(0, centerX - brushSizeInHeightmap / 2);
+        int startZ = Mathf.Max(0, centerZ - brushSizeInHeightmap / 2);
+        int width = Mathf.Min(heightmapWidth - startX, brushSizeInHeightmap);
+        int height = Mathf.Min(heightmapHeight - startZ, brushSizeInHeightmap);
+
+        // Ensure we have valid dimensions
+        if (width <= 0 || height <= 0) return;
+
+        float[,] heights = terrainData.GetHeights(startX, startZ, width, height);
+
+        // Erase using heightmap brush as alpha/mask
+        for (int z = 0; z < height; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                // Calculate position relative to brush center
+                float relX = (x + startX - centerX) / (float)brushSizeInHeightmap + 0.5f;
+                float relZ = (z + startZ - centerZ) / (float)brushSizeInHeightmap + 0.5f;
+
+                // Sample heightmap brush (only if within brush bounds)
+                if (relX >= 0f && relX <= 1f && relZ >= 0f && relZ <= 1f)
+                {
+                    heights[z, x] = 0f;
                 }
             }
         }
