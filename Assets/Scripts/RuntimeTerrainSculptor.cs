@@ -19,7 +19,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
 
     [Header("Input Settings")]
     public KeyCode sculptKey = KeyCode.Mouse0; // Left mouse button
-    public KeyCode sculptKeyInverse = KeyCode.Mouse1; //r button
+    public KeyCode eraseKey = KeyCode.Mouse1; //rb
     public bool continuousSculpt = false; // Sculpt while holding vs click once
 
     [Header("Visual Feedback")]
@@ -83,36 +83,38 @@ public class RuntimeTerrainSculptor : MonoBehaviour
 
                 // Check for sculpt input
                 int shouldSculpt = 0;
-                if(continuousSculpt)
+                if (continuousSculpt)
                 {
-                    if(Input.GetKey(sculptKey))
+                    if (Input.GetKey(sculptKey))
                     {
                         shouldSculpt = 1;
-                        mode = SculptMode.Add;
                     }
-                    else if (Input.GetKey(sculptKeyInverse))
+                    else if (Input.GetKey(eraseKey))
                     {
                         shouldSculpt = -1;
-                        mode = SculptMode.Subtract;
                     }
                 }
                 else
                 {
-                    if(Input.GetKeyDown(sculptKey))
+                    if (Input.GetKeyDown(sculptKey))
                     {
                         shouldSculpt = 1;
-                        mode = SculptMode.Add;
                     }
-                    else if(Input.GetKeyDown(sculptKeyInverse))
+                    else if (Input.GetKeyDown(eraseKey))
                     {
                         shouldSculpt = -1;
-                        mode = SculptMode.Subtract;
                     }
                 }
 
-                if (shouldSculpt != 0 && heightmapBrush != null)
+
+
+                if (shouldSculpt == 1 && heightmapBrush != null)
                 {
                     SculptAtPosition(terrain, hit.point);
+                }
+                else if(shouldSculpt == -1 && heightmapBrush != null)
+                {
+                    EraseAtPosition(terrain, hit.point);
                 }
             }
             else
@@ -216,5 +218,62 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         {
             Destroy(brushPreviewInstance);
         }
+    }
+
+    void EraseAtPosition(Terrain terrain, Vector3 worldPosition)
+    {
+        if (terrain == null || heightmapBrush == null) return;
+
+        TerrainData terrainData = terrain.terrainData;
+
+        // Convert world position to terrain-relative position
+        Vector3 terrainPos = worldPosition - terrain.transform.position;
+
+        // Convert to heightmap coordinates
+        int heightmapWidth = terrainData.heightmapResolution;
+        int heightmapHeight = terrainData.heightmapResolution;
+
+        int centerX = (int)((terrainPos.x / terrainData.size.x) * heightmapWidth);
+        int centerZ = (int)((terrainPos.z / terrainData.size.z) * heightmapHeight);
+
+        // Calculate brush size in heightmap coordinates
+        int brushSizeInHeightmap = (int)((brushSize / terrainData.size.x) * heightmapWidth);
+
+        // Get current heightmap data
+        int startX = Mathf.Max(0, centerX - brushSizeInHeightmap / 2);
+        int startZ = Mathf.Max(0, centerZ - brushSizeInHeightmap / 2);
+        int width = Mathf.Min(heightmapWidth - startX, brushSizeInHeightmap);
+        int height = Mathf.Min(heightmapHeight - startZ, brushSizeInHeightmap);
+
+        // Ensure we have valid dimensions
+        if (width <= 0 || height <= 0) return;
+
+        float[,] heights = terrainData.GetHeights(startX, startZ, width, height);
+
+        // Erase using heightmap brush as alpha/mask
+        for (int z = 0; z < height; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                // Calculate position relative to brush center
+                float relX = (x + startX - centerX) / (float)brushSizeInHeightmap + 0.5f;
+                float relZ = (z + startZ - centerZ) / (float)brushSizeInHeightmap + 0.5f;
+
+                // Sample heightmap brush (only if within brush bounds)
+                if (relX >= 0f && relX <= 1f && relZ >= 0f && relZ <= 1f)
+                {
+                    Color heightColor = heightmapBrush.GetPixelBilinear(relX, relZ);
+                    float brushAlpha = heightColor.grayscale; // Use brush as mask
+
+                    float currentHeight = heights[z, x];
+                    // Lerp toward zero based on brush alpha and strength
+                    float newHeight = Mathf.Lerp(currentHeight, 0f, brushAlpha * strength);
+
+                    heights[z, x] = Mathf.Clamp01(newHeight);
+                }
+            }
+        }
+
+        terrainData.SetHeights(startX, startZ, heights);
     }
 }
