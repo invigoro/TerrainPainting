@@ -155,7 +155,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         // Calculate brush size in heightmap coordinates
         int brushSizeInHeightmap = (int)((brushSize / terrainData.size.x) * heightmapWidth);
 
-        // Get current heightmap data
+        // current heightmap data
         int startX = Mathf.Max(0, centerX - brushSizeInHeightmap / 2);
         int startZ = Mathf.Max(0, centerZ - brushSizeInHeightmap / 2);
         int width = Mathf.Min(heightmapWidth - startX, brushSizeInHeightmap);
