@@ -720,9 +720,12 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 0c5415540e9bbf14d94596e50f7a2bc4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  heightmapBrush: {fileID: 2800000, guid: ff64b711a7688a548b38fd0eb79dc279, type: 3}
+  heightmapBrush: {fileID: 2800000, guid: 6b4c0e44d7c0c344e957e1e7d3933fa7, type: 3}
+  nextHeightMap: {fileID: 0}
+  heightmapGeneratorSettings: {fileID: 11400000, guid: f0ecc28718968e8458d2edf5f393fb1e, type: 2}
   brushSize: 20
   strength: 0.001
+  distToNewBrush: 100
   mode: 0
   sculptKey: 323
   eraseKey: 324

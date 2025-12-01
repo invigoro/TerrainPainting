@@ -3,9 +3,14 @@ using UnityEngine;
 public class RuntimeTerrainSculptor : MonoBehaviour
 {
     [Header("Brush Settings")]
+
     public Texture2D heightmapBrush; // Your heightmap to use as brush
+    public Texture2D nextHeightMap;
+    public HeightmapGenerator heightmapGeneratorSettings;
     public float brushSize = 20f;
     public float strength = 0.5f; // How much the heightmap affects terrain
+    public float distToNewBrush = 10f;
+
 
     [Header("Sculpt Mode")]
     public SculptMode mode = SculptMode.Add;
@@ -28,6 +33,9 @@ public class RuntimeTerrainSculptor : MonoBehaviour
 
     private Camera mainCamera;
     private GameObject brushPreviewInstance;
+    private float distPainted = 0f;
+    private Vector3? lastHitPoint = null;
+    const string DEFAULT_HM_NAME = "generatedTexture";
 
     void Start()
     {
@@ -58,6 +66,11 @@ public class RuntimeTerrainSculptor : MonoBehaviour
                 brushPreviewInstance.GetComponent<Renderer>().material = previewMat;
             }
             brushPreviewInstance.name = "BrushPreview";
+        }
+
+        if(heightmapBrush != null && heightmapGeneratorSettings != null) 
+        {
+            nextHeightMap = heightmapGeneratorSettings.GenerateTexture(DEFAULT_HM_NAME);
         }
     }
 
@@ -116,6 +129,11 @@ public class RuntimeTerrainSculptor : MonoBehaviour
                 {
                     EraseAtPosition(terrain, hit.point);
                 }
+                else if(shouldSculpt == 0)
+                {
+                    lastHitPoint = null;
+                    distPainted = 0f;
+                }
             }
             else
             {
@@ -139,6 +157,19 @@ public class RuntimeTerrainSculptor : MonoBehaviour
     void SculptAtPosition(Terrain terrain, Vector3 worldPosition)
     {
         if (terrain == null || heightmapBrush == null) return;
+
+        if(lastHitPoint != null)
+        {
+            var dist = (worldPosition - lastHitPoint).Value.magnitude;
+            distPainted += dist;
+        }
+        if(distPainted > distToNewBrush)
+        {
+            distPainted -= distToNewBrush;
+            heightmapBrush = nextHeightMap;
+            nextHeightMap = heightmapGeneratorSettings.GenerateTexture(DEFAULT_HM_NAME);
+        }
+        lastHitPoint = worldPosition;
 
         TerrainData terrainData = terrain.terrainData;
 
@@ -165,7 +196,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         if (width <= 0 || height <= 0) return;
 
         float[,] heights = terrainData.GetHeights(startX, startZ, width, height);
-
+        var interpolatedHmBrush = InterpolateHeightmaps(heightmapBrush, nextHeightMap, distPainted / distToNewBrush);
         // Sculpt using heightmap brush
         for (int z = 0; z < height; z++)
         {
@@ -178,7 +209,9 @@ public class RuntimeTerrainSculptor : MonoBehaviour
                 // Sample heightmap brush (only if within brush bounds)
                 if (relX >= 0f && relX <= 1f && relZ >= 0f && relZ <= 1f)
                 {
-                    Color heightColor = heightmapBrush.GetPixelBilinear(relX, relZ);
+                    
+
+                    Color heightColor = interpolatedHmBrush.GetPixelBilinear(relX, relZ);
                     float brushValue = heightColor.grayscale;
 
                     float currentHeight = heights[z, x];
@@ -325,5 +358,55 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         }
 
         terrainData.SetHeights(startX, startZ, heights);
+    }
+
+    private Texture2D InterpolateHeightmaps(Texture2D heightmap1, Texture2D heightmap2, float factor = 0.5f) //factor must be between 0 and 1
+    {
+        factor = Mathf.Clamp01(factor);
+            if (heightmap1 == null || heightmap2 == null)
+            {
+                Debug.LogError("Assign both heightmap textures in the Inspector.");
+                return null;
+            }
+
+            // Ensure both heightmaps have the same dimensions for accurate averaging
+            if (heightmap1.width != heightmap2.width || heightmap1.height != heightmap2.height)
+            {
+                Debug.LogError("Heightmap textures must have the same dimensions.");
+                return null;
+            }
+
+            var resultHeightmap = new Texture2D(heightmap1.width, heightmap1.height, TextureFormat.RFloat, false); // RFloat for height data
+
+            // Make textures readable
+            heightmap1.filterMode = FilterMode.Point;
+            heightmap2.filterMode = FilterMode.Point;
+            heightmap1.wrapMode = TextureWrapMode.Clamp;
+            heightmap2.wrapMode = TextureWrapMode.Clamp;
+
+            // Get pixel data from both heightmaps
+            Color[] pixels1 = heightmap1.GetPixels();
+            Color[] pixels2 = heightmap2.GetPixels();
+            Color[] resultPixels = new Color[pixels1.Length];
+
+            // Iterate through pixels and average the height values
+            for (int i = 0; i < pixels1.Length; i++)
+            {
+                // Assuming heightmap data is stored in the red channel (or grayscale)
+                float height1 = pixels1[i].r * (1 - factor);
+                float height2 = pixels2[i].r * factor;
+
+                float interpolatedHeight = height1 + height2;
+
+                // Assign the averaged height to the red channel of the result pixel
+                resultPixels[i] = new Color(interpolatedHeight, interpolatedHeight, interpolatedHeight, 1f);
+            }
+
+            // Apply the averaged pixels to the result heightmap
+            resultHeightmap.SetPixels(resultPixels);
+            resultHeightmap.Apply();
+
+        return resultHeightmap;
+        
     }
 }
