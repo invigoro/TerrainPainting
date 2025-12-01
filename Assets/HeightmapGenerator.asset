@@ -15,17 +15,17 @@ MonoBehaviour:
   width: 512
   height: 512
   format: 4
-  noiseScale: 99.686516
+  noiseScale: 54.159393
   octaves: 4
   persistence: 0.5
   lacunarity: 2
-  offset: {x: 518.8734, y: 949.61597}
-  heightMultiplier: 0.19
+  offset: {x: 103.14551, y: 550.65985}
+  heightMultiplier: 1.394
   enableSharpness: 0
   sharpnessIterations: 1
   sharpnessIntensity: 0.5
   randomizeSeed: 1
-  seed: 685287230
+  seed: 703974153
   randomOffsetRange: {x: -1000, y: 1000}
   randomScaleRange: {x: 50, y: 200}
   heightmapType: 0
