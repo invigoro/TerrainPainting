@@ -6,6 +6,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
 
     public Texture2D heightmapBrush; // Your heightmap to use as brush
     public Texture2D nextHeightMap;
+    public Texture2D thirdHeightMap;
     public HeightmapGenerator heightmapGeneratorSettings;
     public float brushSize = 20f;
     public float strength = 0.5f; // How much the heightmap affects terrain
@@ -71,6 +72,7 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         if(heightmapBrush != null && heightmapGeneratorSettings != null) 
         {
             nextHeightMap = heightmapGeneratorSettings.GenerateTexture(DEFAULT_HM_NAME);
+            thirdHeightMap = heightmapGeneratorSettings.GenerateTexture(DEFAULT_HM_NAME);
         }
     }
 
@@ -166,8 +168,8 @@ public class RuntimeTerrainSculptor : MonoBehaviour
         if(distPainted > distToNewBrush)
         {
             distPainted -= distToNewBrush;
-            heightmapBrush = nextHeightMap;
-            nextHeightMap = heightmapGeneratorSettings.GenerateTexture(DEFAULT_HM_NAME);
+            while(thirdHeightMap == null) { }
+            ProgressMaps();
         }
         lastHitPoint = worldPosition;
 
@@ -408,5 +410,18 @@ public class RuntimeTerrainSculptor : MonoBehaviour
 
         return resultHeightmap;
         
+    }
+
+    private void ProgressMaps()
+    {
+        heightmapBrush = nextHeightMap;
+        nextHeightMap = thirdHeightMap;
+        thirdHeightMap = null;
+        StartCoroutine(heightmapGeneratorSettings.GenerateTextureAsync(DEFAULT_HM_NAME, SetThirdHeightMapCallback));
+    }
+
+    public void SetThirdHeightMapCallback(Texture2D hm)
+    {
+        thirdHeightMap = hm;
     }
 }

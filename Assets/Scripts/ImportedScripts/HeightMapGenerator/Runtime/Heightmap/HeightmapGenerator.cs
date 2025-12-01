@@ -25,6 +25,7 @@
  * - CurlNoise: Vector field noise producing swirling, curl-like patterns, often for fluid or wind simulation.
  */
 
+using System.Collections;
 using UnityEngine;
 
 [CreateAssetMenu(fileName = "HeightmapGenerator", menuName = "Heightmap Generator/Settings", order = 0)]
@@ -87,5 +88,12 @@ public class HeightmapGenerator : ScriptableObject
             map = HeightmapUtility.ApplySharpness(map, sharpnessIterations, sharpnessIntensity);
 
         return HeightmapUtility.CreateTextureFromMap(map, format, heightMultiplier, textureName);
+    }
+
+    public IEnumerator GenerateTextureAsync(string textureName, System.Action<Texture2D> callback)
+    {
+        var tex = GenerateTexture(textureName);
+        callback(tex);
+        yield return null;
     }
 }
