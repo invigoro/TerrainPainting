@@ -12,5 +12,5 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: fab149e66dfd3cb4e83817b92e327d07, type: 3}
   m_Name: Brush1
   m_EditorClassIdentifier: 
-  Radius: 10
-  Strength: 0.05
+  Radius: 15
+  Strength: 0.151

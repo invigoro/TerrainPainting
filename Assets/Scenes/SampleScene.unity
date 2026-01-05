@@ -816,6 +816,16 @@ MonoBehaviour:
   paintingMode: 0
   ShowBrushPreview: 1
   BrushPreviewPrefab: {fileID: 0}
+  decreaseRadiusKey: 91
+  increaseRadiusKey: 93
+  decreaseStrengthKey: 45
+  increaseStrengthKey: 61
+  radiusStep: 1
+  strengthStep: 0.001
+  minRadius: 1
+  maxRadius: 100
+  minStrength: 0.001
+  maxStrength: 1
 --- !u!1 &2079791042
 GameObject:
   m_ObjectHideFlags: 0

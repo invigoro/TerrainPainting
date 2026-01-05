@@ -15,13 +15,42 @@ public class RuntimeHeightmapPainter : MonoBehaviour
     public bool ShowBrushPreview = true;
     public GameObject BrushPreviewPrefab;
 
+    [Header("Brush Controls")]
+    public KeyCode decreaseRadiusKey = KeyCode.LeftBracket;   // [
+    public KeyCode increaseRadiusKey = KeyCode.RightBracket;  // ]
+
+    public KeyCode decreaseStrengthKey = KeyCode.Minus;       // -
+    public KeyCode increaseStrengthKey = KeyCode.Equals;      // +
+
+    [SerializeField] private int radiusStep = 1;
+    [SerializeField] private float strengthStep = 0.01f;
+
+    [SerializeField] private int minRadius = 1;
+    [SerializeField] private int maxRadius = 100;
+
+    [SerializeField] private float minStrength = 0.001f;
+    [SerializeField] private float maxStrength = 5f;
+
+
     private Camera mainCamera;
     private GameObject brushPreviewInstance;
 
     const string HM_NAME = "heightmap";
 
+    public static RuntimeHeightmapPainter instance;
+
     void Start()
     {
+
+        if(instance != null && instance != this)
+        {
+            Destroy(gameObject);
+        }
+        else
+        {
+            instance = this;
+        }
+
         mainCamera = Camera.main;
 
         // Create brush preview if enabled
@@ -80,6 +109,7 @@ public class RuntimeHeightmapPainter : MonoBehaviour
     // Update is called once per frame
     void Update()
     {
+        HandleBrushKeyboardInput();
         Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
         RaycastHit hit;
 
@@ -189,7 +219,31 @@ public class RuntimeHeightmapPainter : MonoBehaviour
 
         data.SetHeights(startX, startZ, heights);
     }
+    void HandleBrushKeyboardInput()
+    {
+        if (Brush == null)
+            return;
 
+        if (Input.GetKeyDown(decreaseRadiusKey))
+        {
+            Brush.Radius = (int)Mathf.Max(minRadius, Brush.Radius - radiusStep);
+        }
+
+        if (Input.GetKeyDown(increaseRadiusKey))
+        {
+            Brush.Radius = (int)Mathf.Min(maxRadius, Brush.Radius + radiusStep);
+        }
+
+        if (Input.GetKeyDown(decreaseStrengthKey))
+        {
+            Brush.Strength = Mathf.Max(minStrength, Brush.Strength - strengthStep);
+        }
+
+        if (Input.GetKeyDown(increaseStrengthKey))
+        {
+            Brush.Strength = Mathf.Min(maxStrength, Brush.Strength + strengthStep);
+        }
+    }
 }
 
 public enum PaintMode
