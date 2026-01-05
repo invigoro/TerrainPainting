@@ -747,6 +747,7 @@ GameObject:
   serializedVersion: 6
   m_Component:
   - component: {fileID: 1107722673}
+  - component: {fileID: 1107722674}
   - component: {fileID: 1107722672}
   m_Layer: 0
   m_Name: TerrainPainter
@@ -762,7 +763,7 @@ MonoBehaviour:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1107722671}
-  m_Enabled: 1
+  m_Enabled: 0
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 0c5415540e9bbf14d94596e50f7a2bc4, type: 3}
   m_Name: 
@@ -789,12 +790,32 @@ Transform:
   m_GameObject: {fileID: 1107722671}
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 2880.893, y: -4303.468, z: -2199.8123}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1107722674
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1107722671}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: f7eb126006875b147a450cc8e415fab1, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  MainTerrain: {fileID: 293459968}
+  HeightMapCurrent: {fileID: 0}
+  Brush: {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
+  sculptKey: 323
+  eraseKey: 324
+  paintingMode: 0
+  ShowBrushPreview: 1
+  BrushPreviewPrefab: {fileID: 0}
 --- !u!1 &2079791042
 GameObject:
   m_ObjectHideFlags: 0
