@@ -13,4 +13,4 @@ MonoBehaviour:
   m_Name: Brush1
   m_EditorClassIdentifier: 
   Radius: 10
-  Strength: 50
+  Strength: 0.05

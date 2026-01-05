@@ -126,30 +126,70 @@ public class RuntimeHeightmapPainter : MonoBehaviour
 
     void PaintAtPosition(Terrain terrain, Vector3 worldPosition)
     {
-        if (terrain == null || Brush == null) return;
-        var data = terrain.terrainData;
+        if (terrain == null || Brush == null)
+            return;
 
-        //conv hit pos to terrain pos
-        Vector3 pos = worldPosition - terrain.transform.position;
+        if (!Input.GetKey(sculptKey) && !Input.GetKey(eraseKey))
+            return;
 
-        int tmWidth = data.heightmapResolution;
-        int tmHeight = data.heightmapResolution;
+        TerrainData data = terrain.terrainData;
 
+        Vector3 localPos = worldPosition - terrain.transform.position;
 
-        int centerX = (int)((pos.x / data.size.x) * tmWidth);
-        int centerZ = (int)((pos.z / data.size.z) * tmHeight);
+        int hmResolution = data.heightmapResolution;
 
-        //Brush size in hm coord
-        int brushSizeInHm = (int)((Brush.Radius * 2f) / data.size.x) * tmWidth;
+        int centerX = Mathf.RoundToInt((localPos.x / data.size.x) * hmResolution);
+        int centerZ = Mathf.RoundToInt((localPos.z / data.size.z) * hmResolution);
 
-        // current heightmap data
-        int startX = Mathf.Max(0, centerX - brushSizeInHm / 2);
-        int startZ = Mathf.Max(0, centerZ - brushSizeInHm / 2);
-        int width = Mathf.Min(tmWidth - startX, brushSizeInHm);
-        int height = Mathf.Min(tmHeight - startZ, brushSizeInHm);
+        float brushWorldDiameter = Brush.Radius * 2f;
+        int brushSizeHM = Mathf.RoundToInt((brushWorldDiameter / data.size.x) * hmResolution);
 
+        int halfBrush = brushSizeHM / 2;
 
+        int startX = Mathf.Clamp(centerX - halfBrush, 0, hmResolution - 1);
+        int startZ = Mathf.Clamp(centerZ - halfBrush, 0, hmResolution - 1);
+
+        int endX = Mathf.Clamp(centerX + halfBrush, 0, hmResolution);
+        int endZ = Mathf.Clamp(centerZ + halfBrush, 0, hmResolution);
+
+        int width = endX - startX;
+        int height = endZ - startZ;
+
+        if (width <= 0 || height <= 0)
+            return;
+
+        float[,] heights = data.GetHeights(startX, startZ, width, height);
+
+        for (int z = 0; z < height; z++)
+        {
+            for (int x = 0; x < width; x++)
+            {
+                int hmX = startX + x;
+                int hmZ = startZ + z;
+
+                float dx = (hmX - centerX) / (float)halfBrush;
+                float dz = (hmZ - centerZ) / (float)halfBrush;
+
+                float distance01 = Mathf.Sqrt(dx * dx + dz * dz);
+
+                if (distance01 > 1f)
+                    continue;
+
+                float brushStrength = Brush.GetStrength(dx, dz);
+
+                float delta =
+                    brushStrength *
+                    Brush.Strength *
+                    Time.deltaTime *
+                    (paintingMode == PaintMode.PAINT ? 1f : -1f);
+
+                heights[z, x] = Mathf.Clamp01(heights[z, x] + delta);
+            }
+        }
+
+        data.SetHeights(startX, startZ, heights);
     }
+
 }
 
 public enum PaintMode
