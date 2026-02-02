@@ -982,29 +982,27 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MainTerrain: {fileID: 293459968}
-  HeightMapCurrent: {fileID: 0}
   Brush: {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
   sculptKey: 323
   eraseKey: 324
-  paintingMode: 0
-  ShowBrushPreview: 1
-  BrushPreviewPrefab: {fileID: 0}
   decreaseRadiusKey: 91
   increaseRadiusKey: 93
   decreaseStrengthKey: 45
   increaseStrengthKey: 61
   radiusStep: 1
-  strengthStep: 0.001
+  strengthStep: 0.01
   minRadius: 1
   maxRadius: 100
   minStrength: 0.001
-  maxStrength: 1
-  brushColor: {r: 1, g: 1, b: 1, a: 1}
-  material: {fileID: 2100000, guid: faae200107ac964429e1e2cf7931e23b, type: 2}
-  texturePaintStrength: 0.5
+  maxStrength: 5
+  showBrushPreview: 1
+  brushPreviewPrefab: {fileID: 0}
+  paintHeight: 1
   paintTexture: 1
+  texturePaintStrength: 1
   colorTextureSize: 32
-  colorMatchThreshold: 0.1
+  texturesSavePath: TerrainTextures/Generated
+  brushColor: {r: 1, g: 1, b: 1, a: 1}
 --- !u!1 &2079791042
 GameObject:
   m_ObjectHideFlags: 0
