@@ -1,253 +1,368 @@
 using UnityEngine;
+using System.Collections.Generic;
+using System.IO;
+
+#if UNITY_EDITOR
+using UnityEditor;
+#endif
 
 public class RuntimeHeightmapPainter : MonoBehaviour
 {
     public Terrain MainTerrain;
-    public Texture2D HeightMapCurrent;
     public PaintBrushKernel Brush;
 
-    [Header("Input Settings")]
-    public KeyCode sculptKey = KeyCode.Mouse0; // Left mouse button
-    public KeyCode eraseKey = KeyCode.Mouse1; //rb
-    public PaintMode paintingMode = PaintMode.PAINT;
-
-    [Header("Visual Feedback")]
-    public bool ShowBrushPreview = true;
-    public GameObject BrushPreviewPrefab;
+    [Header("Input")]
+    public KeyCode sculptKey = KeyCode.Mouse0;
+    public KeyCode eraseKey = KeyCode.Mouse1;
 
     [Header("Brush Controls")]
-    public KeyCode decreaseRadiusKey = KeyCode.LeftBracket;   // [
-    public KeyCode increaseRadiusKey = KeyCode.RightBracket;  // ]
+    public KeyCode decreaseRadiusKey = KeyCode.LeftBracket;
+    public KeyCode increaseRadiusKey = KeyCode.RightBracket;
+    public KeyCode decreaseStrengthKey = KeyCode.Minus;
+    public KeyCode increaseStrengthKey = KeyCode.Equals;
 
-    public KeyCode decreaseStrengthKey = KeyCode.Minus;       // -
-    public KeyCode increaseStrengthKey = KeyCode.Equals;      // +
+    public int radiusStep = 1;
+    public float strengthStep = 0.01f;
 
-    [SerializeField] private int radiusStep = 1;
-    [SerializeField] private float strengthStep = 0.01f;
+    public int minRadius = 1;
+    public int maxRadius = 100;
+    public float minStrength = 0.001f;
+    public float maxStrength = 5f;
 
-    [SerializeField] private int minRadius = 1;
-    [SerializeField] private int maxRadius = 100;
+    [Header("Brush Preview")]
+    public bool showBrushPreview = true;
+    public GameObject brushPreviewPrefab;
 
-    [SerializeField] private float minStrength = 0.001f;
-    [SerializeField] private float maxStrength = 5f;
+    [Header("Height Painting")]
+    public bool paintHeight = true;
 
+    [Header("Texture Painting")]
+    public bool paintTexture = true;
+    public float texturePaintStrength = 0.5f;
+    public int colorTextureSize = 32;
+    public string texturesSavePath = "TerrainTextures/Generated";
 
-    private Camera mainCamera;
-    private GameObject brushPreviewInstance;
+    [SerializeField]
+    private Color brushColor = Color.white;
 
-    const string HM_NAME = "heightmap";
+    private Camera cam;
+    private GameObject brushPreview;
+    private int currentLayer = -1;
 
-    public static RuntimeHeightmapPainter instance;
+    private readonly Dictionary<string, int> colorHexToLayer = new();
 
-    void Start()
+    // =====================================================
+    // Unity lifecycle
+    // =====================================================
+
+    void Awake()
     {
+        cam = Camera.main;
 
-        if(instance != null && instance != this)
+        if (!MainTerrain || !Brush)
         {
-            Destroy(gameObject);
-        }
-        else
-        {
-            instance = this;
-        }
-
-        mainCamera = Camera.main;
-
-        // Create brush preview if enabled
-        if (ShowBrushPreview)
-        {
-            if (BrushPreviewPrefab != null)
-            {
-                brushPreviewInstance = Instantiate(BrushPreviewPrefab);
-            }
-            else
-            {
-                // Create a simple sphere as preview
-                brushPreviewInstance = GameObject.CreatePrimitive(PrimitiveType.Sphere);
-                brushPreviewInstance.GetComponent<Collider>().enabled = false;
-                Material previewMat = new Material(Shader.Find("Standard"));
-                previewMat.color = new Color(0f, 1f, 1f, 0.5f);
-                previewMat.SetFloat("_Mode", 3); // Transparent
-                previewMat.SetInt("_SrcBlend", (int)UnityEngine.Rendering.BlendMode.SrcAlpha);
-                previewMat.SetInt("_DstBlend", (int)UnityEngine.Rendering.BlendMode.OneMinusSrcAlpha);
-                previewMat.SetInt("_ZWrite", 0);
-                previewMat.DisableKeyword("_ALPHATEST_ON");
-                previewMat.EnableKeyword("_ALPHABLEND_ON");
-                previewMat.DisableKeyword("_ALPHAPREMULTIPLY_ON");
-                previewMat.renderQueue = 3000;
-                brushPreviewInstance.GetComponent<Renderer>().material = previewMat;
-            }
-            brushPreviewInstance.name = "BrushPreview";
+            Debug.LogError("Missing terrain or brush.");
+            enabled = false;
+            return;
         }
 
-        if(MainTerrain)
-        {
-            //get stats
-            var terrainData = MainTerrain.terrainData;
-            int tdWidth = terrainData.heightmapResolution;
-            int tdHeight = terrainData.heightmapResolution;
-            float[,] heights = terrainData.GetHeights(0, 0, tdWidth, tdHeight);
-            if (!HeightMapCurrent)
-            {
-
-                for(int i = 0; i < tdWidth; i++)
-                {
-                    for (int j = 0; j < tdHeight; j++)
-                    {
-                        heights[j, i] = 0;
-                    }
-                }
-                HeightMapCurrent = HeightmapUtility.CreateTextureFromMap(heights, TextureFormat.RGBA32, 1, HM_NAME);
-            }
-            else
-            {
-                Color[] pixels = HeightMapCurrent.GetPixels();
-            }
-        }
+        EnsureBaseLayer();
+        IndexExistingLayers();
+        CreateBrushPreview();
     }
 
-    // Update is called once per frame
     void Update()
     {
         HandleBrushKeyboardInput();
-        Ray ray = mainCamera.ScreenPointToRay(Input.mousePosition);
-        RaycastHit hit;
 
-        if (Physics.Raycast(ray, out hit))
-        {
-            Terrain terrain = hit.collider.GetComponent<Terrain>();
-            if (terrain && terrain == MainTerrain)
-            {
-                // Update brush preview position
-                if (ShowBrushPreview && brushPreviewInstance != null)
-                {
-                    brushPreviewInstance.SetActive(true);
-                    brushPreviewInstance.transform.position = hit.point + Vector3.up * 2f;
-                    brushPreviewInstance.transform.localScale = Vector3.one * Brush.Radius * 2f;
-                }
-                if (Input.GetKeyDown(sculptKey))
-                    {
-                        paintingMode = PaintMode.PAINT;
-                    }
-                    else if (Input.GetKeyDown(eraseKey))
-                    {
-                        paintingMode = PaintMode.ERASE;
-                    }
-                PaintAtPosition(terrain, hit.point);
-            }
-            else
-            {
-                // Hide preview if no terrain hit
-                if (ShowBrushPreview && brushPreviewInstance != null)
-                {
-                    brushPreviewInstance.SetActive(false);
-                }
-            }
-        }
-        else
-        {
-            // Hide preview if no raycast hit
-            if (ShowBrushPreview && brushPreviewInstance != null)
-            {
-                brushPreviewInstance.SetActive(false);
-            }
-        }
+        if (paintTexture)
+            currentLayer = GetOrCreateLayerForColor(brushColor);
+
+        Ray ray = cam.ScreenPointToRay(Input.mousePosition);
+        bool hitTerrain = Physics.Raycast(ray, out RaycastHit hit)
+                          && hit.collider.GetComponent<Terrain>() == MainTerrain;
+
+        UpdateBrushPreview(hitTerrain, hit);
+
+        if (!hitTerrain)
+            return;
+
+        bool painting = Input.GetKey(sculptKey);
+        bool erasing = Input.GetKey(eraseKey);
+
+        if (painting || erasing)
+            PaintAt(hit.point, painting);
     }
 
-    void PaintAtPosition(Terrain terrain, Vector3 worldPosition)
+    // =====================================================
+    // Painting logic
+    // =====================================================
+
+    void PaintAt(Vector3 worldPos, bool paint)
     {
-        if (terrain == null || Brush == null)
-            return;
+        TerrainData data = MainTerrain.terrainData;
+        Vector3 local = worldPos - MainTerrain.transform.position;
 
-        if (!Input.GetKey(sculptKey) && !Input.GetKey(eraseKey))
-            return;
+        if (paintHeight)
+            PaintHeight(data, local, paint);
 
-        TerrainData data = terrain.terrainData;
+        if (paintTexture)
+            PaintTexture(data, local, paint);
+    }
 
-        Vector3 localPos = worldPosition - terrain.transform.position;
+    void PaintHeight(TerrainData data, Vector3 local, bool paint)
+    {
+        int res = data.heightmapResolution;
 
-        int hmResolution = data.heightmapResolution;
+        int cx = Mathf.RoundToInt(local.x / data.size.x * res);
+        int cz = Mathf.RoundToInt(local.z / data.size.z * res);
 
-        int centerX = Mathf.RoundToInt((localPos.x / data.size.x) * hmResolution);
-        int centerZ = Mathf.RoundToInt((localPos.z / data.size.z) * hmResolution);
+        int diameter = Mathf.RoundToInt((Brush.Radius * 2f / data.size.x) * res);
+        int half = Mathf.Max(1, diameter / 2);
 
-        float brushWorldDiameter = Brush.Radius * 2f;
-        int brushSizeHM = Mathf.RoundToInt((brushWorldDiameter / data.size.x) * hmResolution);
+        int sx = Mathf.Clamp(cx - half, 0, res - 1);
+        int sz = Mathf.Clamp(cz - half, 0, res - 1);
+        int ex = Mathf.Clamp(cx + half, 0, res);
+        int ez = Mathf.Clamp(cz + half, 0, res);
 
-        int halfBrush = brushSizeHM / 2;
+        float[,] heights = data.GetHeights(sx, sz, ex - sx, ez - sz);
 
-        int startX = Mathf.Clamp(centerX - halfBrush, 0, hmResolution - 1);
-        int startZ = Mathf.Clamp(centerZ - halfBrush, 0, hmResolution - 1);
-
-        int endX = Mathf.Clamp(centerX + halfBrush, 0, hmResolution);
-        int endZ = Mathf.Clamp(centerZ + halfBrush, 0, hmResolution);
-
-        int width = endX - startX;
-        int height = endZ - startZ;
-
-        if (width <= 0 || height <= 0)
-            return;
-
-        float[,] heights = data.GetHeights(startX, startZ, width, height);
-
-        for (int z = 0; z < height; z++)
-        {
-            for (int x = 0; x < width; x++)
+        for (int z = 0; z < heights.GetLength(0); z++)
+            for (int x = 0; x < heights.GetLength(1); x++)
             {
-                int hmX = startX + x;
-                int hmZ = startZ + z;
-
-                float dx = (hmX - centerX) / (float)halfBrush;
-                float dz = (hmZ - centerZ) / (float)halfBrush;
-
-                float distance01 = Mathf.Sqrt(dx * dx + dz * dz);
-
-                if (distance01 > 1f)
-                    continue;
-
-                float brushStrength = Brush.GetStrength(dx, dz);
+                float dx = (sx + x - cx) / (float)half;
+                float dz = (sz + z - cz) / (float)half;
+                float d = Mathf.Sqrt(dx * dx + dz * dz);
+                if (d > 1f) continue;
 
                 float delta =
-                    brushStrength *
+                    Brush.GetStrength(dx, dz) *
                     Brush.Strength *
                     Time.deltaTime *
-                    (paintingMode == PaintMode.PAINT ? 1f : -1f);
+                    (paint ? 1f : -1f);
 
                 heights[z, x] = Mathf.Clamp01(heights[z, x] + delta);
             }
-        }
 
-        data.SetHeights(startX, startZ, heights);
+        data.SetHeights(sx, sz, heights);
     }
-    void HandleBrushKeyboardInput()
+
+    void PaintTexture(TerrainData data, Vector3 local, bool paint)
     {
-        if (Brush == null)
+        int aw = data.alphamapWidth;
+        int ah = data.alphamapHeight;
+
+        int cx = Mathf.RoundToInt(local.x / data.size.x * aw);
+        int cz = Mathf.RoundToInt(local.z / data.size.z * ah);
+
+        int diameter = Mathf.RoundToInt((Brush.Radius * 2f / data.size.x) * aw);
+        int half = Mathf.Max(1, diameter / 2);
+
+        int sx = Mathf.Clamp(cx - half, 0, aw - 1);
+        int sz = Mathf.Clamp(cz - half, 0, ah - 1);
+        int ex = Mathf.Clamp(cx + half, 0, aw);
+        int ez = Mathf.Clamp(cz + half, 0, ah);
+
+        float[,,] map = data.GetAlphamaps(sx, sz, ex - sx, ez - sz);
+        int layers = map.GetLength(2);
+
+        int targetLayer = paint ? currentLayer : 0;
+        if (targetLayer < 0 || targetLayer >= layers)
             return;
 
+        for (int z = 0; z < map.GetLength(0); z++)
+            for (int x = 0; x < map.GetLength(1); x++)
+            {
+                float dx = (sx + x - cx) / (float)half;
+                float dz = (sz + z - cz) / (float)half;
+                float d = Mathf.Sqrt(dx * dx + dz * dz);
+                if (d > 1f) continue;
+
+                float amt =
+                    Brush.GetStrength(dx, dz) *
+                    texturePaintStrength *
+                    Time.deltaTime;
+
+                map[z, x, targetLayer] =
+                    Mathf.Lerp(map[z, x, targetLayer], 1f, amt);
+
+                float sum = 0f;
+                for (int l = 0; l < layers; l++) sum += map[z, x, l];
+                for (int l = 0; l < layers; l++) map[z, x, l] /= sum;
+            }
+
+        data.SetAlphamaps(sx, sz, map);
+
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(data);
+#endif
+    }
+
+    // =====================================================
+    // Brush controls & preview
+    // =====================================================
+
+    void HandleBrushKeyboardInput()
+    {
         if (Input.GetKeyDown(decreaseRadiusKey))
-        {
-            Brush.Radius = (int)Mathf.Max(minRadius, Brush.Radius - radiusStep);
-        }
+            Brush.Radius = Mathf.Max(minRadius, Brush.Radius - radiusStep);
 
         if (Input.GetKeyDown(increaseRadiusKey))
-        {
-            Brush.Radius = (int)Mathf.Min(maxRadius, Brush.Radius + radiusStep);
-        }
+            Brush.Radius = Mathf.Min(maxRadius, Brush.Radius + radiusStep);
 
         if (Input.GetKeyDown(decreaseStrengthKey))
-        {
             Brush.Strength = Mathf.Max(minStrength, Brush.Strength - strengthStep);
-        }
 
         if (Input.GetKeyDown(increaseStrengthKey))
-        {
             Brush.Strength = Mathf.Min(maxStrength, Brush.Strength + strengthStep);
+    }
+
+    void CreateBrushPreview()
+    {
+        if (!showBrushPreview) return;
+
+        brushPreview = brushPreviewPrefab
+            ? Instantiate(brushPreviewPrefab)
+            : GameObject.CreatePrimitive(PrimitiveType.Sphere);
+
+        brushPreview.name = "BrushPreview";
+        Destroy(brushPreview.GetComponent<Collider>());
+    }
+
+    void UpdateBrushPreview(bool hit, RaycastHit hitInfo)
+    {
+        if (!brushPreview) return;
+
+        brushPreview.SetActive(hit);
+        if (!hit) return;
+
+        brushPreview.transform.position = hitInfo.point + Vector3.up * 0.1f;
+        brushPreview.transform.localScale = Vector3.one * Brush.Radius * 2f;
+    }
+
+    // =====================================================
+    // Terrain layer management
+    // =====================================================
+
+    void EnsureBaseLayer()
+    {
+        TerrainData data = MainTerrain.terrainData;
+
+        if (data.terrainLayers != null && data.terrainLayers.Length > 0)
+            return;
+
+        TerrainLayer baseLayer = GetOrCreateTerrainLayer(Color.gray);
+        data.terrainLayers = new TerrainLayer[] { baseLayer };
+
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(data);
+#endif
+    }
+
+    void IndexExistingLayers()
+    {
+        colorHexToLayer.Clear();
+        TerrainLayer[] layers = MainTerrain.terrainData.terrainLayers;
+
+        for (int i = 0; i < layers.Length; i++)
+        {
+            TerrainLayer layer = layers[i];
+            if (!layer || !layer.diffuseTexture) continue;
+
+#if UNITY_EDITOR
+            string path = AssetDatabase.GetAssetPath(layer.diffuseTexture);
+            EnsureReadable(path);
+#endif
+
+            Texture2D tex = layer.diffuseTexture;
+            Color c = tex.GetPixel(tex.width / 2, tex.height / 2);
+            colorHexToLayer[ColorToHex(c)] = i;
         }
     }
-}
 
-public enum PaintMode
-{
-    PAINT = 0,
-    ERASE = 1,
+    int GetOrCreateLayerForColor(Color color)
+    {
+        string hex = ColorToHex(color);
+        if (colorHexToLayer.TryGetValue(hex, out int index))
+            return index;
+
+        TerrainLayer layer = GetOrCreateTerrainLayer(color);
+        TerrainData data = MainTerrain.terrainData;
+
+        var old = data.terrainLayers;
+        var next = new TerrainLayer[old.Length + 1];
+        old.CopyTo(next, 0);
+        next[^1] = layer;
+
+        data.terrainLayers = next;
+        colorHexToLayer[hex] = next.Length - 1;
+
+#if UNITY_EDITOR
+        EditorUtility.SetDirty(data);
+#endif
+
+        return next.Length - 1;
+    }
+
+    TerrainLayer GetOrCreateTerrainLayer(Color color)
+    {
+#if UNITY_EDITOR
+        string hex = ColorToHex(color);
+        string dir = Path.Combine("Assets", texturesSavePath);
+        Directory.CreateDirectory(dir);
+
+        string texPath = Path.Combine(dir, $"Tex_{hex}.png");
+        string layerPath = Path.Combine(dir, $"Layer_{hex}.asset");
+
+        Texture2D tex = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath);
+        if (!tex)
+        {
+            tex = new Texture2D(colorTextureSize, colorTextureSize, TextureFormat.RGBA32, false);
+            var pixels = new Color[colorTextureSize * colorTextureSize];
+            for (int i = 0; i < pixels.Length; i++) pixels[i] = color;
+            tex.SetPixels(pixels);
+            tex.Apply();
+
+            File.WriteAllBytes(texPath, tex.EncodeToPNG());
+            AssetDatabase.ImportAsset(texPath);
+        }
+
+        EnsureReadable(texPath);
+
+        TerrainLayer layer = AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerPath);
+        if (!layer)
+        {
+            layer = new TerrainLayer
+            {
+                diffuseTexture = AssetDatabase.LoadAssetAtPath<Texture2D>(texPath),
+                tileSize = new Vector2(10, 10)
+            };
+
+            AssetDatabase.CreateAsset(layer, layerPath);
+        }
+
+        return AssetDatabase.LoadAssetAtPath<TerrainLayer>(layerPath);
+#else
+        return null;
+#endif
+    }
+
+#if UNITY_EDITOR
+    static void EnsureReadable(string assetPath)
+    {
+        if (string.IsNullOrEmpty(assetPath)) return;
+
+        var importer = AssetImporter.GetAtPath(assetPath) as TextureImporter;
+        if (!importer || importer.isReadable) return;
+
+        importer.isReadable = true;
+        importer.textureCompression = TextureImporterCompression.Uncompressed;
+        importer.SaveAndReimport();
+    }
+#endif
+
+    static string ColorToHex(Color c)
+    {
+        return ColorUtility.ToHtmlStringRGBA(c);
+    }
 }
