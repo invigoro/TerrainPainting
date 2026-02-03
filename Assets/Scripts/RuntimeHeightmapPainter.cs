@@ -181,7 +181,8 @@ public class RuntimeHeightmapPainter : MonoBehaviour
                 float amt =
                     Brush.GetStrength(dx, dz) *
                     texturePaintStrength *
-                    Time.deltaTime;
+                    Time.deltaTime *
+                    (paint ? 1f : 100f);
 
                 map[z, x, targetLayer] =
                     Mathf.Lerp(map[z, x, targetLayer], 1f, amt);
