@@ -9,11 +9,20 @@ using UnityEditor;
 public class RuntimeHeightmapPainter : MonoBehaviour
 {
     public Terrain MainTerrain;
-    public PaintBrushKernel Brush;
+
+    [Header("Brushes")]
+    public List<PaintBrushKernel> AvailableBrushes = new();
+    private int currentBrushIndex = 0;
+    private PaintBrushKernel CurrentBrush =>
+        AvailableBrushes != null && AvailableBrushes.Count > 0 && currentBrushIndex >= 0 && currentBrushIndex < AvailableBrushes.Count
+        ? AvailableBrushes[currentBrushIndex]
+        : null;
 
     [Header("Input")]
     public KeyCode sculptKey = KeyCode.Mouse0;
     public KeyCode eraseKey = KeyCode.Mouse1;
+    public KeyCode nextBrushKey = KeyCode.Alpha2;
+    public KeyCode prevBrushKey = KeyCode.Alpha1;
 
     [Header("Brush Controls")]
     public KeyCode decreaseRadiusKey = KeyCode.LeftBracket;
@@ -59,20 +68,28 @@ public class RuntimeHeightmapPainter : MonoBehaviour
     {
         cam = Camera.main;
 
-        if (!MainTerrain || !Brush)
+        if (!MainTerrain)
         {
-            Debug.LogError("Missing terrain or brush.");
+            Debug.LogError("Missing terrain.");
             enabled = false;
             return;
+        }
+
+        if (AvailableBrushes == null || AvailableBrushes.Count == 0)
+        {
+            Debug.LogWarning("No brushes available. Please add brushes to AvailableBrushes list.");
         }
 
         EnsureBaseLayer();
         IndexExistingLayers();
         CreateBrushPreview();
+
+        Debug.Log($"Starting with brush: {(CurrentBrush != null ? CurrentBrush.name : "None")}");
     }
 
     void Update()
     {
+        HandleBrushSelection();
         HandleBrushKeyboardInput();
 
         if (paintTexture)
@@ -95,11 +112,45 @@ public class RuntimeHeightmapPainter : MonoBehaviour
     }
 
     // =====================================================
+    // Brush selection
+    // =====================================================
+
+    void HandleBrushSelection()
+    {
+        if (AvailableBrushes == null || AvailableBrushes.Count == 0)
+            return;
+
+        int previousIndex = currentBrushIndex;
+
+        if (Input.GetKeyDown(nextBrushKey))
+        {
+            currentBrushIndex = (currentBrushIndex + 1) % AvailableBrushes.Count;
+        }
+        else if (Input.GetKeyDown(prevBrushKey))
+        {
+            currentBrushIndex--;
+            if (currentBrushIndex < 0)
+                currentBrushIndex = AvailableBrushes.Count - 1;
+        }
+
+        if (previousIndex != currentBrushIndex && CurrentBrush != null)
+        {
+            Debug.Log($"Switched to brush {currentBrushIndex + 1}/{AvailableBrushes.Count}: {CurrentBrush.name} (Preset: {CurrentBrush.Preset})");
+        }
+    }
+
+    // =====================================================
     // Painting logic
     // =====================================================
 
     void PaintAt(Vector3 worldPos, bool paint)
     {
+        if (CurrentBrush == null)
+        {
+            Debug.LogWarning("No brush selected!");
+            return;
+        }
+
         TerrainData data = MainTerrain.terrainData;
         Vector3 local = worldPos - MainTerrain.transform.position;
 
@@ -117,7 +168,7 @@ public class RuntimeHeightmapPainter : MonoBehaviour
         int cx = Mathf.RoundToInt(local.x / data.size.x * res);
         int cz = Mathf.RoundToInt(local.z / data.size.z * res);
 
-        int diameter = Mathf.RoundToInt((Brush.Radius * 2f / data.size.x) * res);
+        int diameter = Mathf.RoundToInt((CurrentBrush.Radius * 2f / data.size.x) * res);
         int half = Mathf.Max(1, diameter / 2);
 
         int sx = Mathf.Clamp(cx - half, 0, res - 1);
@@ -136,8 +187,7 @@ public class RuntimeHeightmapPainter : MonoBehaviour
                 if (d > 1f) continue;
 
                 float delta =
-                    Brush.GetStrength(dx, dz) *
-                    Brush.Strength *
+                    CurrentBrush.GetStrength(dx, dz) *
                     Time.deltaTime *
                     (paint ? 1f : -1f);
 
@@ -155,7 +205,7 @@ public class RuntimeHeightmapPainter : MonoBehaviour
         int cx = Mathf.RoundToInt(local.x / data.size.x * aw);
         int cz = Mathf.RoundToInt(local.z / data.size.z * ah);
 
-        int diameter = Mathf.RoundToInt((Brush.Radius * 2f / data.size.x) * aw);
+        int diameter = Mathf.RoundToInt((CurrentBrush.Radius * 2f / data.size.x) * aw);
         int half = Mathf.Max(1, diameter / 2);
 
         int sx = Mathf.Clamp(cx - half, 0, aw - 1);
@@ -179,7 +229,7 @@ public class RuntimeHeightmapPainter : MonoBehaviour
                 if (d > 1f) continue;
 
                 float amt =
-                    Brush.GetStrength(dx, dz) *
+                    CurrentBrush.GetStrength(dx, dz) *
                     texturePaintStrength *
                     Time.deltaTime *
                     (paint ? 1f : 100f);
@@ -205,17 +255,20 @@ public class RuntimeHeightmapPainter : MonoBehaviour
 
     void HandleBrushKeyboardInput()
     {
+        if (CurrentBrush == null)
+            return;
+
         if (Input.GetKeyDown(decreaseRadiusKey))
-            Brush.Radius = Mathf.Max(minRadius, Brush.Radius - radiusStep);
+            CurrentBrush.Radius = Mathf.Max(minRadius, CurrentBrush.Radius - radiusStep);
 
         if (Input.GetKeyDown(increaseRadiusKey))
-            Brush.Radius = Mathf.Min(maxRadius, Brush.Radius + radiusStep);
+            CurrentBrush.Radius = Mathf.Min(maxRadius, CurrentBrush.Radius + radiusStep);
 
         if (Input.GetKeyDown(decreaseStrengthKey))
-            Brush.Strength = Mathf.Max(minStrength, Brush.Strength - strengthStep);
+            CurrentBrush.Strength = Mathf.Max(minStrength, CurrentBrush.Strength - strengthStep);
 
         if (Input.GetKeyDown(increaseStrengthKey))
-            Brush.Strength = Mathf.Min(maxStrength, Brush.Strength + strengthStep);
+            CurrentBrush.Strength = Mathf.Min(maxStrength, CurrentBrush.Strength + strengthStep);
     }
 
     void CreateBrushPreview()
@@ -232,13 +285,13 @@ public class RuntimeHeightmapPainter : MonoBehaviour
 
     void UpdateBrushPreview(bool hit, RaycastHit hitInfo)
     {
-        if (!brushPreview) return;
+        if (!brushPreview || CurrentBrush == null) return;
 
         brushPreview.SetActive(hit);
         if (!hit) return;
 
         brushPreview.transform.position = hitInfo.point + Vector3.up * 0.1f;
-        brushPreview.transform.localScale = Vector3.one * Brush.Radius * 2f;
+        brushPreview.transform.localScale = Vector3.one * CurrentBrush.Radius * 2f;
     }
 
     // =====================================================

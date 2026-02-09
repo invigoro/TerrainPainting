@@ -982,9 +982,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   MainTerrain: {fileID: 293459968}
-  Brush: {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
+  AvailableBrushes:
+  - {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
+  - {fileID: 11400000, guid: 1c8a7b8e84bf5f146aeb89fabfaedf87, type: 2}
+  - {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
   sculptKey: 323
   eraseKey: 324
+  nextBrushKey: 50
+  prevBrushKey: 49
   decreaseRadiusKey: 91
   increaseRadiusKey: 93
   decreaseStrengthKey: 45
