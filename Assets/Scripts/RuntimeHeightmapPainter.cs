@@ -1,6 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
 using System.IO;
+using System.Security.Cryptography;
+
 
 #if UNITY_EDITOR
 using UnityEditor;
@@ -186,8 +188,16 @@ public class RuntimeHeightmapPainter : MonoBehaviour
                 float d = Mathf.Sqrt(dx * dx + dz * dz);
                 if (d > 1f) continue;
 
+                Vector3 worldSamplePos =
+                    MainTerrain.transform.position +
+                new Vector3(
+        ((sx + x) / (float)res) * data.size.x,
+        0f,
+        ((sz + z) / (float)res) * data.size.z
+    );
+
                 float delta =
-                    CurrentBrush.GetStrength(dx, dz) *
+                    CurrentBrush.GetStrength(dx, dz, worldSamplePos.x, worldSamplePos.z) *
                     Time.deltaTime *
                     (paint ? 1f : -1f);
 
@@ -228,8 +238,16 @@ public class RuntimeHeightmapPainter : MonoBehaviour
                 float d = Mathf.Sqrt(dx * dx + dz * dz);
                 if (d > 1f) continue;
 
+                Vector3 worldSamplePos =
+    MainTerrain.transform.position +
+    new Vector3(
+        ((sx + x) / (float)aw) * data.size.x,
+        0f,
+        ((sz + z) / (float)ah) * data.size.z
+    );
+
                 float amt =
-                    CurrentBrush.GetStrength(dx, dz) *
+                    CurrentBrush.GetStrength(dx, dz, worldSamplePos.x, worldSamplePos.z) *
                     texturePaintStrength *
                     Time.deltaTime *
                     (paint ? 1f : 100f);

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.LightTransport;
 
 [CreateAssetMenu(fileName = "PaintBrushKernel", menuName = "Terrain/Paint Brush Kernel")]
 public class PaintBrushKernel : ScriptableObject
@@ -44,7 +45,7 @@ public class PaintBrushKernel : ScriptableObject
     /// <param name="dx">Normalized X distance from center (-1 to 1)</param>
     /// <param name="dz">Normalized Z distance from center (-1 to 1)</param>
     /// <returns>Strength value (0 to 1)</returns>
-    public float GetStrength(float dx, float dz)
+    public float GetStrength(float dx, float dz, float worldX = 0f, float worldZ = 0f)
     {
         // Calculate distance from center (0 to 1, where 1 is at the edge)
         float distance = Mathf.Sqrt(dx * dx + dz * dz);
@@ -60,7 +61,7 @@ public class PaintBrushKernel : ScriptableObject
         }
 
         // Otherwise use preset
-        float strength = GetPresetStrength(distance);
+        float strength = GetPresetStrength(distance, worldX, worldZ);
 
         // Apply hardness (makes the brush more uniform in the center)
         strength = ApplyHardness(strength, distance);
@@ -71,7 +72,7 @@ public class PaintBrushKernel : ScriptableObject
     /// <summary>
     /// Get brush strength based on the selected preset
     /// </summary>
-    private float GetPresetStrength(float distance)
+    private float GetPresetStrength(float distance, float worldX, float worldZ)
     {
         switch (Preset)
         {
@@ -114,6 +115,59 @@ public class PaintBrushKernel : ScriptableObject
             case BrushPreset.Custom:
                 // Customizable with falloff parameter
                 return Mathf.Pow(1f - distance, Falloff);
+
+            case BrushPreset.Noise:
+                {
+                    float nx = worldX * NoiseScale;
+                    float nz = worldZ * NoiseScale;
+
+                    float n = Mathf.PerlinNoise(nx + RandomSeed, nz + RandomSeed);
+
+                    // increase contrast
+                    n = Mathf.Pow(n, NoiseContrast);
+
+                    return n;
+                }
+
+            case BrushPreset.RandomSpikes:
+                {
+                    float cellX = Mathf.Floor(worldX * NoiseScale);
+                    float cellZ = Mathf.Floor(worldZ * NoiseScale);
+
+                    float hash = Hash(cellX, cellZ);
+
+                    return (hash < SpikeDensity) ? 1f : 0f;
+                }
+
+            case BrushPreset.Voronoi:
+                {
+                    float px = worldX * NoiseScale;
+                    float pz = worldZ * NoiseScale;
+
+                    float minDist = 999f;
+
+                    for (int i = 0; i < VoronoiCellCount; i++)
+                    {
+                        float ox = Hash(i, 0) * 2f - 1f;
+                        float oz = Hash(0, i) * 2f - 1f;
+
+                        float dxv = px - ox;
+                        float dzv = pz - oz;
+
+                        float d = dxv * dxv + dzv * dzv;
+
+                        if (d < minDist)
+                            minDist = d;
+                    }
+
+                    return Mathf.Clamp01(1f - Mathf.Sqrt(minDist));
+                }
+
+            case BrushPreset.CellularBlobs:
+                {
+                    float n = Mathf.PerlinNoise(worldX * NoiseScale, worldZ * NoiseScale);
+                    return Mathf.SmoothStep(0.4f, 0.6f, n);
+                }
 
             default:
                 return 1f - distance;
@@ -167,6 +221,12 @@ public class PaintBrushKernel : ScriptableObject
         preview.Apply();
         return preview;
     }
+    float Hash(float x, float y)
+    {
+        float h = Mathf.Sin(x * 127.1f + y * 311.7f + RandomSeed) * 43758.5453f;
+        return h - Mathf.Floor(h);
+    }
+
 }
 
 /// <summary>
