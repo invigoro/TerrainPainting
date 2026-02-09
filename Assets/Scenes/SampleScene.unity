@@ -983,13 +983,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   MainTerrain: {fileID: 293459968}
   AvailableBrushes:
+  - {fileID: 11400000, guid: abe2acfa2c7c0694c9d4eb60cf49e0b0, type: 2}
   - {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
   - {fileID: 11400000, guid: 1c8a7b8e84bf5f146aeb89fabfaedf87, type: 2}
   - {fileID: 11400000, guid: 98f4e0650d1dc544fbfcf6f35419e46d, type: 2}
   - {fileID: 11400000, guid: fea99d2ac28623f4e8f1acf984c627c8, type: 2}
   - {fileID: 11400000, guid: 880f31e68ada76c448b6c48b240ac700, type: 2}
   - {fileID: 11400000, guid: 5e62d92ff0301bc4e87ca13886e505f8, type: 2}
-  - {fileID: 11400000, guid: abe2acfa2c7c0694c9d4eb60cf49e0b0, type: 2}
   sculptKey: 323
   eraseKey: 324
   nextBrushKey: 50
